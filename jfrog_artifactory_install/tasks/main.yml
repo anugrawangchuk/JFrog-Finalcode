@@ -1,0 +1,54 @@
+---
+- name: Update package list
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - fontconfig
+      - openjdk-17-jdk  # Specify OpenJDK version 17
+    state: present
+
+- name: Add JFrog GPG key
+  apt_key:
+    url: https://releases.jfrog.io/artifactory/api/gpg/key/public
+    state: present
+
+- name: Get distribution codename
+  command: lsb_release -cs
+  register: distro
+
+- name: Add JFrog Artifactory repository
+  lineinfile:
+    path: /etc/apt/sources.list.d/jfrog.list
+    line: "deb https://releases.jfrog.io/artifactory/artifactory-debs {{ distro.stdout }} main"
+    state: present
+    create: yes  # Ensure the file is created if it does not exist
+
+- name: Update package list again to include JFrog repo
+  apt:
+    update_cache: yes
+
+- name: Install JFrog Artifactory
+  apt:
+    name: jfrog-artifactory-oss  # Specify the Artifactory package name
+    state: present
+
+- name: Configure JFrog Artifactory
+  template:
+    src: artifactory_config.yml.j2  # Ensure correct template file
+    dest: /opt/jfrog/artifactory/var/etc/system.yaml
+  notify: Restart Artifactory service
+
+- name: Start Artifactory service
+  systemd:
+    name: artifactory
+    state: started
+    enabled: yes
+
+- name: Restart Artifactory service
+  systemd:
+    name: artifactory
+    state: restarted
+

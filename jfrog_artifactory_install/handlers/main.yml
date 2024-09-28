@@ -1,0 +1,6 @@
+---
+- name: Restart Artifactory service
+  systemd:
+    name: artifactory
+    state: restarted
+

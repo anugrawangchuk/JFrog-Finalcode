@@ -1,0 +1,14 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: Anugra
+  description: Ansible role to install JFrog Artifactory on Debian and Red Hat-based systems.
+  min_ansible_version: 2.9
+
+  # Tags for easy filtering in Ansible Galaxy
+  tags:
+    - artifactory
+    - jfrog
+    - package
+    - install

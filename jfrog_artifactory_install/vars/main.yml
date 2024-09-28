@@ -1,0 +1,5 @@
+---
+artifactory_package: "jfrog-artifactory-cpp-ce"
+java_package: "openjdk-17-jre"
+db_allow_non_postgresql: true
+
