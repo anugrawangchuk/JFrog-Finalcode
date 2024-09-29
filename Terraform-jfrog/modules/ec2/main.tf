@@ -10,7 +10,8 @@ resource "aws_instance" "public_instance" {
   }
 
   tags = {
-    Name = "Public Instance"
+    Name = "Ansible-Dynamic-Inventory"  # Tag for Ansible
+    Type = "Public"
   }
   # Attach public security group
   vpc_security_group_ids = [var.public_sg_id]
@@ -19,7 +20,7 @@ resource "aws_instance" "public_instance" {
 
 resource "aws_instance" "private_instance" {
   ami           = var.ami_id
-  instance_type = "t2.medium"
+  instance_type = "t3.medium"
   subnet_id     = var.private_subnet_id
   key_name = var.key_name
 
@@ -28,7 +29,8 @@ resource "aws_instance" "private_instance" {
   }
 
   tags = {
-    Name = "Private Instance"
+    Name = "Ansible-Dynamic-Inventory"  # Tag for Ansible
+    Type = "Private"
   }
 
   # Attach private security group
