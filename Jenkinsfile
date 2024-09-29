@@ -14,7 +14,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 // Checkout the repository containing Terraform and Ansible code
-                git url: 'https://github.com/your-repo/JFrog-Finalcode.git', branch: 'main'
+                git url: 'https://github.com/anugrawangchuk/JFrog-Finalcode.git', branch: 'main'
             }
         }
 
