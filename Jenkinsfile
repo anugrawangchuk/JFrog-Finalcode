@@ -91,10 +91,10 @@ pipeline {
     }
 
     post {
-        always {
+        // always {
             // Cleanup workspace after the build
-            cleanWs()
-        }
+            // cleanWs()
+        //}
         success {
             echo 'Terraform and Ansible execution succeeded!'
         }
