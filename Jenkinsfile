@@ -21,6 +21,7 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
+                dir('Terraform-jfrog') {
                 // Initialize the Terraform backend (S3 and DynamoDB for state locking)
                 sh '''
                     terraform init \
@@ -29,13 +30,16 @@ pipeline {
                     -backend-config="region=${REGION}" \
                     -backend-config="dynamodb_table=demo"
                 '''
+                }
             }
         }
 
         stage('Terraform Plan') {
             steps {
+                dir('Terraform-jfrog') {
                 // Show the Terraform plan with lock disabled
                 sh 'terraform plan -lock=false -out=tfplan'
+                }
             }
         }
 
@@ -48,8 +52,10 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
+                dir('Terraform-jfrog') {
                 // Apply the Terraform changes with lock disabled
                 sh 'terraform apply -auto-approve -lock=false'
+                }
             }
         }
 
@@ -68,8 +74,10 @@ pipeline {
                 expression { params.ACTION == 'destroy' }
             }
             steps {
+                dir('Terraform-jfrog') {
                 // Destroy Infra
                 sh 'terraform destroy -auto-approve'
+                }
             }
         }
         stage('Ansible Playbook Execution') {
@@ -78,7 +86,7 @@ pipeline {
             }
             steps {
                 // Run the Ansible playbook using dynamic inventory (aws_ec2.yml)
-                dir('ansible') {
+                dir('https://github.com/anugrawangchuk/JFrog-Finalcode.git') {
                     withCredentials([sshUserPrivateKey(credentialsId: 'my-ssh-key', keyFileVariable: 'SSH_KEY')]) {
                         sh '''
                         ansible-playbook -i aws_ec2.yml playbook.yml --private-key $SSH_KEY
