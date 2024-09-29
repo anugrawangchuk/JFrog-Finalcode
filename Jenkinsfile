@@ -1,55 +1,53 @@
 pipeline {
     agent any
+
     parameters {
-        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Select action: apply or destroy')
+        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Choose the Terraform action to perform')
     }
+
     environment {
-        // Define AWS credentials as environment variables
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-        REGION                = 'us-east-1'
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key')  // AWS credentials stored in Jenkins
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                // Check out the repository with Terraform code
-                git branch: 'main', 
-                    url: 'https://github.com/anugrawangchuk/Test.git'
+                // Checkout the repository containing Terraform and Ansible code
+                git url: 'https://github.com/your-repo/JFrog-Finalcode.git', branch: 'main'
             }
         }
 
         stage('Terraform Init') {
             steps {
-                // Initialize the Terraform backend (S3 and DynamoDB for state locking)
-                sh '''
-                    terraform init \
-                    -backend-config="bucket=jfrog-anugra" \
-                    -backend-config="key=terraform/state" \
-                    -backend-config="region=${REGION}" \
-                    -backend-config="dynamodb_table=demo"
-                '''
+                // Initialize Terraform
+                dir('terraform') {
+                    sh 'terraform init'
+                }
             }
         }
 
         stage('Terraform Plan') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
             steps {
-                // Show the Terraform plan with lock disabled
-                sh 'terraform plan -lock=false -out=tfplan'
+                // Run Terraform plan to preview changes before applying
+                dir('terraform') {
+                    sh 'terraform plan'
+                }
             }
         }
 
-        // stage('User Approval') {
-        //     input {
-        //         message 'Do you want to apply the Terraform changes?'
-        //         ok 'Yes, apply'
-        //     }
-        // }
-
         stage('Terraform Apply') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
             steps {
                 // Apply the Terraform changes with lock disabled
-                sh 'terraform apply -auto-approve -lock=false'
+                dir('terraform') {
+                    sh 'terraform apply -auto-approve -lock=false'
+                }
             }
         }
 
@@ -59,7 +57,7 @@ pipeline {
             }
             steps {
                 // Prompt for approval before destroying resources
-                input "Do you want to Terraform Destroy?"
+                input "Do you want to proceed with Terraform Destroy?"
             }
         }
 
@@ -68,16 +66,40 @@ pipeline {
                 expression { params.ACTION == 'destroy' }
             }
             steps {
-                // Destroy Infra
-                sh 'terraform destroy -auto-approve'
+                // Destroy the infrastructure
+                dir('terraform') {
+                    sh 'terraform destroy -auto-approve'
+                }
+            }
+        }
+
+        stage('Ansible Playbook Execution') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                // Run the Ansible playbook using dynamic inventory (aws_ec2.yml)
+                dir('ansible') {
+                    withCredentials([sshUserPrivateKey(credentialsId: 'my-ssh-key', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                        ansible-playbook -i aws_ec2.yml playbook.yml --private-key $SSH_KEY
+                        '''
+                    }
+                }
             }
         }
     }
 
-    // post {
-    //     always {
-    //         // Cleanup workspace after the build
-    //         cleanWs()
-    //     }
-    // }
+    post {
+        always {
+            // Cleanup workspace after the build
+            cleanWs()
+        }
+        success {
+            echo 'Terraform and Ansible execution succeeded!'
+        }
+        failure {
+            echo 'Terraform and Ansible execution failed!'
+        }
+    }
 }
