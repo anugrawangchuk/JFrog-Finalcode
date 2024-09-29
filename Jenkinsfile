@@ -1,53 +1,55 @@
 pipeline {
     agent any
-
     parameters {
-        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Choose the Terraform action to perform')
+        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Select action: apply or destroy')
     }
-
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')  // AWS credentials stored in Jenkins
+        // Define AWS credentials as environment variables
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        REGION                = 'us-east-1'
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
-                // Checkout the repository containing Terraform and Ansible code
-                git url: 'https://github.com/anugrawangchuk/JFrog-Finalcode.git', branch: 'main'
+                // Check out the repository with Terraform code
+                git branch: 'main', 
+                    url: 'https://github.com/anugrawangchuk/JFrog-Finalcode.git'
             }
         }
 
         stage('Terraform Init') {
             steps {
-                // Initialize Terraform
-                dir('terraform') {
-                    sh 'terraform init'
-                }
+                // Initialize the Terraform backend (S3 and DynamoDB for state locking)
+                sh '''
+                    terraform init \
+                    -backend-config="bucket=jfrog-anugra" \
+                    -backend-config="key=terraform/state" \
+                    -backend-config="region=${REGION}" \
+                    -backend-config="dynamodb_table=demo"
+                '''
             }
         }
 
         stage('Terraform Plan') {
-            when {
-                expression { params.ACTION == 'apply' }
-            }
             steps {
-                // Run Terraform plan to preview changes before applying
-                dir('terraform') {
-                    sh 'terraform plan'
-                }
+                // Show the Terraform plan with lock disabled
+                sh 'terraform plan -lock=false -out=tfplan'
             }
         }
 
+        // stage('User Approval') {
+        //     input {
+        //         message 'Do you want to apply the Terraform changes?'
+        //         ok 'Yes, apply'
+        //     }
+        // }
+
         stage('Terraform Apply') {
-            when {
-                expression { params.ACTION == 'apply' }
-            }
             steps {
                 // Apply the Terraform changes with lock disabled
-                dir('terraform') {
-                    sh 'terraform apply -auto-approve -lock=false'
-                }
+                sh 'terraform apply -auto-approve -lock=false'
             }
         }
 
@@ -57,7 +59,7 @@ pipeline {
             }
             steps {
                 // Prompt for approval before destroying resources
-                input "Do you want to proceed with Terraform Destroy?"
+                input "Do you want to Terraform Destroy?"
             }
         }
 
@@ -66,13 +68,10 @@ pipeline {
                 expression { params.ACTION == 'destroy' }
             }
             steps {
-                // Destroy the infrastructure
-                dir('terraform') {
-                    sh 'terraform destroy -auto-approve'
-                }
+                // Destroy Infra
+                sh 'terraform destroy -auto-approve'
             }
         }
-
         stage('Ansible Playbook Execution') {
             when {
                 expression { params.ACTION == 'apply' }
@@ -89,17 +88,5 @@ pipeline {
             }
         }
     }
-
-    post {
-        // always {
-            // Cleanup workspace after the build
-            // cleanWs()
-        //}
-        success {
-            echo 'Terraform and Ansible execution succeeded!'
-        }
-        failure {
-            echo 'Terraform and Ansible execution failed!'
-        }
-    }
 }
+
