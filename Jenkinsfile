@@ -84,7 +84,7 @@ pipeline {
                     expression { params.ACTION == 'apply' }
                 }
                 steps {
-                    dir('Jfrog') {
+                   # dir('Jfrog') {
                         script {
                             // Reading the correct file path for bastion and jfrogIp IPs
                             def bastionIp = readFile('../terraform/bastion_ip.txt').trim()
@@ -100,7 +100,7 @@ pipeline {
                             scp -i /var/lib/jenkins/Terraform_1.pem /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp}:/home/ubuntu/
                             ssh -i /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp} 'sudo chmod 400 /home/ubuntu/Terraform_1.pem'
                             """
-                        }
+                       # }
                         
                         sh '''
                         ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory /var/lib/jenkins/workspace/Jfrog/playbook.yml
