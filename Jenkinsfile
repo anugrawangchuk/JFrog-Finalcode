@@ -86,9 +86,9 @@ pipeline {
                 steps {
                     dir('JFrog-Finalcode') {
                         script {
-                            // Reading the correct file path for bastion and elasticsearch IPs
+                            // Reading the correct file path for bastion and jfrogIp IPs
                             def bastionIp = readFile('../terraform/bastion_ip.txt').trim()
-                            def elasticsearchIp = readFile('../terraform/jfrog_ip.txt').trim()
+                            def jfrogIp = readFile('../terraform/jfrog_ip.txt').trim()
                             // Dynamically creating the inventory file with the correct IP addresses
                             writeFile file: 'inventory', text: """
                             
