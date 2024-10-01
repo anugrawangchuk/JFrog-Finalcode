@@ -1,6 +1,9 @@
 ---
 - hosts: bastion
   become: true
+   vars:
+    bastionIp: "{{ lookup('file', '/var/lib/jenkins/workspace/JFrog-Finalcode/terraform/bastion_ip.txt') }}"
+    jfrogIp: "{{ lookup('file', '/var/lib/jenkins/workspace/JFrog-Finalcode/terraform/jfrog_ip.txt') }}"
   roles:
     - nginx
 - hosts: Jfrog
