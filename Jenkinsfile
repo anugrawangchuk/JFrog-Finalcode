@@ -28,29 +28,24 @@ pipeline {
                         -backend-config="dynamodb_table=demo"
                     '''
                 }
-               
             }
         }
         stage('Terraform Plan') {
             steps {
-                   dir('terraform') {
-                       sh 'terraform plan -lock=false'
-                   }
+                dir('terraform') {
+                    sh 'terraform plan -lock=false'
+                }
             }
         }
-        
         stage('Terraform Apply') {
             steps {
-                   dir('terraform') {
-                       sh """
-                       terraform apply -auto-approve -lock=false
-                    
-                       terraform output -raw IP_Public_Bastion > bastion_ip.txt
-                       terraform output -raw IP_jfrog > jfrog_ip.txt
-                       
-                       """
-                   }
-                
+                dir('terraform') {
+                    sh '''
+                        terraform apply -auto-approve -lock=false
+                        terraform output -raw IP_Public_Bastion > bastion_ip.txt
+                        terraform output -raw IP_jfrog > jfrog_ip.txt
+                    '''
+                }
             }
         }
         stage('Approval for Destroy') {
@@ -62,51 +57,55 @@ pipeline {
                 input "Do you want to Terraform Destroy?"
             }
         }
-            stage('Terraform Destroy') {
-                when {
-                    expression { params.ACTION == 'destroy' }
-                }
-                steps {
-                       dir('terraform') {
-                           sh 'terraform destroy -auto-approve'
-                       }
-                }
-                post {
-                    always {
-                    // Cleanup workspace after the build
-                        cleanWs()
-                    }
+        stage('Terraform Destroy') {
+            when {
+                expression { params.ACTION == 'destroy' }
+            }
+            steps {
+                dir('terraform') {
+                    sh 'terraform destroy -auto-approve'
                 }
             }
-            
-            stage('Ansible Playbook Execution') {
-                when {
-                    expression { params.ACTION == 'apply' }
+            post {
+                always {
+                    // Cleanup workspace after the build
+                    cleanWs()
                 }
-                steps {
-                   // dir('Jfrog') {
-                        script {
-                            // Reading the correct file path for bastion and jfrogIp IPs
-                            def bastionIp = readFile('../terraform/bastion_ip.txt').trim()
-                            def jfrogIp = readFile('../terraform/jfrog_ip.txt').trim()
+            }
+        }
+        stage('Ansible Playbook Execution') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                dir('terraform') {
+                    // Checking if the output files exist before proceeding
+                    script {
+                        def bastionIpPath = "${env.WORKSPACE}/terraform/bastion_ip.txt"
+                        def jfrogIpPath = "${env.WORKSPACE}/terraform/jfrog_ip.txt"
+                        if (fileExists(bastionIpPath) && fileExists(jfrogIpPath)) {
+                            def bastionIp = readFile(bastionIpPath).trim()
+                            def jfrogIp = readFile(jfrogIpPath).trim()
+
                             // Dynamically creating the inventory file with the correct IP addresses
                             writeFile file: 'inventory', text: """
-                            
                             [bastion]
-                            
                             ${bastionIp} ansible_ssh_private_key_file=/var/lib/jenkins/Terraform_1.pem ansible_user=ubuntu
                             [Jfrog]
                             ${jfrogIp} ansible_ssh_private_key_file=/var/lib/jenkins/Terraform_1.pem ansible_user=ubuntu
                             scp -i /var/lib/jenkins/Terraform_1.pem /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp}:/home/ubuntu/
                             ssh -i /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp} 'sudo chmod 400 /home/ubuntu/Terraform_1.pem'
                             """
-                       // }
-                        
-                        sh '''
-                        ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory /var/lib/jenkins/workspace/Jfrog/playbook.yml
-                        '''
+
+                            sh '''
+                            ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory /var/lib/jenkins/workspace/Jfrog/playbook.yml
+                            '''
+                        } else {
+                            error "One or both of the IP files (bastion_ip.txt, jfrog_ip.txt) were not found!"
+                        }
                     }
                 }
             }
+        }
     }
 }
