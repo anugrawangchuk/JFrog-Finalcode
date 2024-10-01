@@ -84,7 +84,7 @@ pipeline {
                     expression { params.ACTION == 'apply' }
                 }
                 steps {
-                    dir('jfrog-anugraF') {
+                    dir('JFrog-Finalcode') {
                         script {
                             // Reading the correct file path for bastion and elasticsearch IPs
                             def bastionIp = readFile('../terraform/bastion_ip.txt').trim()
