@@ -83,29 +83,24 @@ pipeline {
                     script {
                         def bastionIpPath = "${env.WORKSPACE}/terraform/bastion_ip.txt"
                         def jfrogIpPath = "${env.WORKSPACE}/terraform/jfrog_ip.txt"
-                        
-                        // Check if the IP files exist
                         if (fileExists(bastionIpPath) && fileExists(jfrogIpPath)) {
-                            // Read the IP addresses from files
                             def bastionIp = readFile(bastionIpPath).trim()
                             def jfrogIp = readFile(jfrogIpPath).trim()
 
-                            // Dynamically create the inventory file with the correct IP addresses
+                            // Dynamically creating the inventory file with the correct IP addresses
                             writeFile file: 'inventory', text: """
                             [bastion]
                             ${bastionIp} ansible_ssh_private_key_file=/var/lib/jenkins/Terraform_1.pem ansible_user=ubuntu
-
                             [Jfrog]
                             ${jfrogIp} ansible_ssh_private_key_file=/var/lib/jenkins/Terraform_1.pem ansible_user=ubuntu
                             """
 
-                            // Transfer the private key to the Bastion host and set the proper permissions
+                            // Disable host key checking during scp and ssh
                             sh """
-                            scp -i /var/lib/jenkins/Terraform_1.pem /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp}:/home/ubuntu/
-                            ssh -i /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp} 'sudo chmod 400 /home/ubuntu/Terraform_1.pem'
+                                scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/Terraform_1.pem /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp}:/home/ubuntu/
+                                ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp} 'sudo chmod 400 /home/ubuntu/Terraform_1.pem'
                             """
 
-                            // Run the Ansible playbook
                             sh '''
                             ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory /var/lib/jenkins/workspace/Jfrog/playbook.yml
                             '''
