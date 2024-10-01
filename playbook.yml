@@ -1,5 +1,9 @@
 ---
-- hosts: all
+- hosts: 
   become: yes
   roles:
     - jfrog_artifactory_install
+- hosts: bastion
+  become: true
+  roles:
+    - nginx

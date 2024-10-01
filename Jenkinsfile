@@ -9,7 +9,6 @@ pipeline {
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
         REGION                = 'us-east-1'
     }
-
     stages {
         stage('Checkout') {
             steps {
@@ -18,47 +17,42 @@ pipeline {
                     url: 'https://github.com/anugrawangchuk/JFrog-Finalcode.git'
             }
         }
-
         stage('Terraform Init') {
             steps {
-                dir('Terraform-jfrog') {
-                // Initialize the Terraform backend (S3 and DynamoDB for state locking)
-                sh '''
-                    terraform init \
-                    -backend-config="bucket=jfrog-anugra" \
-                    -backend-config="key=terraform/state" \
-                    -backend-config="region=${REGION}" \
-                    -backend-config="dynamodb_table=demo"
-                '''
+                dir('terraform') {
+                    sh '''
+                        terraform init \
+                        -backend-config="bucket=jfrog-anugra" \
+                        -backend-config="key=terraform/state" \
+                        -backend-config="region=${REGION}" \
+                        -backend-config="dynamodb_table=demo"
+                    '''
                 }
+               
             }
         }
-
         stage('Terraform Plan') {
             steps {
-                dir('Terraform-jfrog') {
-                // Show the Terraform plan with lock disabled
-                sh 'terraform plan -lock=false -out=tfplan'
-                }
+                   dir('terraform') {
+                       sh 'terraform plan -lock=false'
+                   }
             }
         }
-
-        // stage('User Approval') {
-        //     input {
-        //         message 'Do you want to apply the Terraform changes?'
-        //         ok 'Yes, apply'
-        //     }
-        // }
-
+        
         stage('Terraform Apply') {
             steps {
-                dir('Terraform-jfrog') {
-                // Apply the Terraform changes with lock disabled
-                sh 'terraform apply -auto-approve -lock=false'
-                }
+                   dir('terraform') {
+                       sh """
+                       terraform apply -auto-approve -lock=false
+                    
+                       terraform output -raw IP_Public_Bastion > bastion_ip.txt
+                       terraform output -raw IP_jfrog > jfrog_ip.txt
+                       
+                       """
+                   }
+                
             }
         }
-
         stage('Approval for Destroy') {
             when {
                 expression { params.ACTION == 'destroy' }
@@ -68,31 +62,51 @@ pipeline {
                 input "Do you want to Terraform Destroy?"
             }
         }
-
-        stage('Terraform Destroy') {
-            when {
-                expression { params.ACTION == 'destroy' }
-            }
-            steps {
-                dir('Terraform-jfrog') {
-                // Destroy Infra
-                sh 'terraform destroy -auto-approve'
+            stage('Terraform Destroy') {
+                when {
+                    expression { params.ACTION == 'destroy' }
+                }
+                steps {
+                       dir('terraform') {
+                           sh 'terraform destroy -auto-approve'
+                       }
+                }
+                post {
+                    always {
+                    // Cleanup workspace after the build
+                        cleanWs()
+                    }
                 }
             }
-        }
-        stage('Ansible Playbook Execution') {
-            when {
-                expression { params.ACTION == 'apply' }
-            }
-            steps {
-                // Run the Ansible playbook using dynamic inventory (aws_ec2.yml)
-                    withCredentials([sshUserPrivateKey(credentialsId: 'my-ssh-key', keyFileVariable: 'SSH_KEY')]) {
+            
+            stage('Ansible Playbook Execution') {
+                when {
+                    expression { params.ACTION == 'apply' }
+                }
+                steps {
+                    dir('jfrog-anugraF') {
+                        script {
+                            // Reading the correct file path for bastion and elasticsearch IPs
+                            def bastionIp = readFile('../terraform/bastion_ip.txt').trim()
+                            def elasticsearchIp = readFile('../terraform/jfrog_ip.txt').trim()
+                            // Dynamically creating the inventory file with the correct IP addresses
+                            writeFile file: 'inventory', text: """
+                            
+                            [bastion]
+                            
+                            ${bastionIp} ansible_ssh_private_key_file=/var/lib/jenkins/Terraform_1.pem ansible_user=ubuntu
+                            [Jfrog]
+                            ${jfrogIp} ansible_ssh_private_key_file=/var/lib/jenkins/Terraform_1.pem ansible_user=ubuntu
+                            scp -i /var/lib/jenkins/Terraform_1.pem /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp}:/home/ubuntu/
+                            ssh -i /var/lib/jenkins/Terraform_1.pem ubuntu@${bastionIp} 'sudo chmod 400 /home/ubuntu/Terraform_1.pem'
+                            """
+                        }
+                        
                         sh '''
-                        ansible-playbook -i aws_ec2.yml playbook.yml --private-key $SSH_KEY
+                        ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory /var/lib/jenkins/workspace/JFrog-Finalcode/playbook.yml
                         '''
                     }
+                }
             }
-        }
     }
 }
-
