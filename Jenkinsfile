@@ -84,7 +84,7 @@ pipeline {
                     expression { params.ACTION == 'apply' }
                 }
                 steps {
-                    dir('JFrog-Finalcode') {
+                    dir('Jfrog') {
                         script {
                             // Reading the correct file path for bastion and jfrogIp IPs
                             def bastionIp = readFile('../terraform/bastion_ip.txt').trim()
@@ -103,7 +103,7 @@ pipeline {
                         }
                         
                         sh '''
-                        ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory /var/lib/jenkins/workspace/JFrog-Finalcode/playbook.yml
+                        ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory /var/lib/jenkins/workspace/Jfrog/playbook.yml
                         '''
                     }
                 }
