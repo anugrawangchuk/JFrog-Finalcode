@@ -1,4 +1,9 @@
 ---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+  become: true
+
 - name: Install Nginx
   apt:
     name: nginx
@@ -13,7 +18,7 @@
 
 - name: Deploy Nginx configuration for Artifactory
   template:
-    src: nginx.conf.j2  # Change this to your template file name
+    src: nginx.conf.j2
     dest: /etc/nginx/sites-available/artifactory
   become: true
 
@@ -33,6 +38,3 @@
     name: nginx
     state: restarted
   become: true
-
-
-
