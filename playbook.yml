@@ -3,7 +3,7 @@
   become: true
   roles:
     - nginx
-- hosts: 
+- hosts: Jfrog
   become: yes
   roles:
     - jfrog_artifactory_install
